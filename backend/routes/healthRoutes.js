@@ -47,6 +47,90 @@ const validPatientId = (id) => {
 // PATIENT HEALTH RECORDS
 // ===============================
 
+// Save the readings from one form submission as a single health record.
+router.post("/measurements", patientOnly, async (req, res) => {
+  try {
+    const { systolic, diastolic, heartRate: heartRateInput, weight: weightInput } = req.body;
+    const hasSystolic = systolic !== undefined && systolic !== "";
+    const hasDiastolic = diastolic !== undefined && diastolic !== "";
+    const hasHeartRate = heartRateInput !== undefined && heartRateInput !== "";
+    const hasWeight = weightInput !== undefined && weightInput !== "";
+
+    if (hasSystolic !== hasDiastolic) {
+      return res.status(400).json({
+        message: "Enter both systolic and diastolic blood pressure values."
+      });
+    }
+
+    const recordData = {
+      patientId: req.user.userId
+    };
+
+    if (hasSystolic && hasDiastolic) {
+      const upper = Number(systolic);
+      const lower = Number(diastolic);
+
+      if (
+        !Number.isFinite(upper) ||
+        !Number.isFinite(lower) ||
+        upper <= 0 ||
+        lower <= 0 ||
+        upper <= lower
+      ) {
+        return res.status(400).json({
+          message: "Enter valid blood pressure values."
+        });
+      }
+
+      recordData.bloodPressure = {
+        systolic: upper,
+        diastolic: lower
+      };
+    }
+
+    if (hasHeartRate) {
+      const heartRate = Number(heartRateInput);
+      if (!Number.isFinite(heartRate) || heartRate <= 0 || heartRate > 300) {
+        return res.status(400).json({
+          message: "Enter a valid heart rate."
+        });
+      }
+
+      recordData.heartRate = heartRate;
+    }
+
+    if (hasWeight) {
+      const weight = Number(weightInput);
+      if (!Number.isFinite(weight) || weight <= 0 || weight > 500) {
+        return res.status(400).json({
+          message: "Enter a valid weight in kilograms."
+        });
+      }
+
+      recordData.weight = weight;
+    }
+
+    if (!hasSystolic && !hasDiastolic && !hasHeartRate && !hasWeight) {
+      return res.status(400).json({
+        message: "Enter at least one measurement."
+      });
+    }
+
+    const record = await HealthRecord.create(recordData);
+
+    res.status(201).json({
+      message: "Measurements saved successfully.",
+      record
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: "Unable to save measurements."
+    });
+  }
+});
+
 // Save blood pressure
 router.post("/blood-pressure", patientOnly, async (req, res) => {
   try {
